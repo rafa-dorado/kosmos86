@@ -1,0 +1,1642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOSMOS-86: Emergencia Atompunk</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=Oswald:wght@300;400;700&display=swap');
+
+  :root {
+    --green: #00ff41;
+    --green-dim: #00a829;
+    --green-dark: #003d0f;
+    --amber: #ffb300;
+    --red: #ff1a1a;
+    --red-dim: #7a0000;
+    --bg: #020a03;
+    --scanline: rgba(0,0,0,0.15);
+    --glow: 0 0 10px #00ff41, 0 0 20px #00ff4155, 0 0 40px #00ff4122;
+    --glow-red: 0 0 10px #ff1a1a, 0 0 20px #ff1a1a88;
+    --glow-amber: 0 0 8px #ffb300, 0 0 16px #ffb30066;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    height: 100vh; /* Altura estricta */
+    overflow: hidden; /* Evita el scroll global de la página */
+    cursor: default;
+  }
+
+  /* Scanlines overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      var(--scanline) 0px,
+      var(--scanline) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* CRT vignette */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.85) 100%);
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  /* CONTENEDOR PRINCIPAL FLEXIBLE */
+  #app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2vh 20px; /* Padding vertical ajustado por viewport */
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Separación uniforme sin necesidad de margins inferiores */
+  }
+
+  /* Header */
+  .crt-header {
+    text-align: center;
+    border: 2px solid var(--green-dim);
+    border-top: 4px solid var(--green);
+    padding: 10px;
+    position: relative;
+    background: linear-gradient(180deg, #001a05 0%, var(--bg) 100%);
+    box-shadow: var(--glow), inset 0 0 30px rgba(0,255,65,0.05);
+    flex-shrink: 0; /* Impide que el header se aplaste */
+  }
+
+  .crt-header::before {
+    content: '◄ К-86 TERMINAL ГЛАВНОГО УПРАВЛЕНИЯ ►';
+    display: block;
+    font-size: 10px;
+    color: var(--green-dim);
+    letter-spacing: 3px;
+    margin-bottom: 4px;
+  }
+
+  .title-main {
+    font-family: 'VT323', monospace;
+    font-size: clamp(28px, 5vw, 54px);
+    color: var(--green);
+    text-shadow: var(--glow);
+    letter-spacing: 4px;
+    line-height: 1;
+    animation: flicker 8s infinite;
+  }
+
+  .title-sub {
+    font-family: 'Oswald', sans-serif;
+    font-size: clamp(10px, 1.5vw, 14px);
+    color: var(--amber);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-top: 4px;
+    text-shadow: var(--glow-amber);
+  }
+
+  @keyframes flicker {
+    0%,95%,100% { opacity: 1; }
+    96% { opacity: 0.7; }
+    97% { opacity: 1; }
+    98% { opacity: 0.5; }
+    99% { opacity: 1; }
+  }
+
+  /* HUD */
+  .hud {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .hud-panel {
+    border: 1px solid var(--green-dim);
+    padding: 8px 12px;
+    background: rgba(0,40,10,0.3);
+    position: relative;
+  }
+
+  .hud-label {
+    font-size: 10px;
+    color: var(--green-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .hud-value {
+    font-family: 'VT323', monospace;
+    font-size: 24px;
+    color: var(--green);
+    text-shadow: var(--glow);
+  }
+
+  .hud-value.danger { color: var(--red); text-shadow: var(--glow-red); animation: blink 0.5s infinite; }
+  .hud-value.warning { color: var(--amber); text-shadow: var(--glow-amber); }
+
+  .progress-bar {
+    height: 6px;
+    background: var(--green-dark);
+    margin-top: 4px;
+    border: 1px solid var(--green-dim);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--green);
+    transition: width 0.5s ease, background 0.3s;
+    box-shadow: var(--glow);
+  }
+
+  .progress-fill.rad { background: var(--red); box-shadow: var(--glow-red); }
+  .progress-fill.pressure-high { background: var(--amber); box-shadow: var(--glow-amber); }
+
+  /* Inventory */
+  .inventory-panel {
+    border: 1px solid var(--green-dim);
+    padding: 6px 12px;
+    background: rgba(0,40,10,0.2);
+    min-height: 32px;
+    flex-shrink: 0;
+  }
+
+  .inventory-label {
+    font-size: 10px;
+    color: var(--green-dim);
+    letter-spacing: 2px;
+    display: inline-block;
+    margin-right: 10px;
+  }
+
+  .inv-item {
+    display: inline-block;
+    background: rgba(0,255,65,0.1);
+    border: 1px solid var(--green-dim);
+    padding: 2px 8px;
+    margin: 2px;
+    font-size: 11px;
+    color: var(--amber);
+  }
+
+  /* Main terminal - ÁREA CON SCROLL INTERNO */
+  .terminal {
+    flex: 1 1 0; /* Ocupa el espacio restante dinámicamente */
+    min-height: 0; /* Permite que el flex child colapse y active el scroll */
+    overflow-y: auto; /* Activa el scroll vertical interno */
+    border: 2px solid var(--green-dim);
+    border-bottom: 4px solid var(--green);
+    background: rgba(0,15,5,0.8);
+    padding: 16px 24px;
+    position: relative;
+    box-shadow: inset 0 0 60px rgba(0,255,65,0.03);
+  }
+
+  /* Scrollbar personalizado estilo Atompunk */
+  .terminal::-webkit-scrollbar {
+    width: 12px;
+  }
+  .terminal::-webkit-scrollbar-track {
+    background: rgba(0, 20, 5, 0.8);
+    border-left: 1px solid var(--green-dark);
+  }
+  .terminal::-webkit-scrollbar-thumb {
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+  }
+  .terminal::-webkit-scrollbar-thumb:hover {
+    background: var(--green);
+  }
+
+  .terminal::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    animation: scan 4s linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes scan {
+    0% { top: 0; opacity: 0.5; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  .terminal-text {
+    line-height: 1.6;
+    font-size: clamp(13px, 1.5vw, 15px);
+    white-space: pre-wrap;
+  }
+
+  .terminal-text .prompt {
+    color: var(--green-dim);
+  }
+
+  .alert-line {
+    color: var(--red);
+    text-shadow: var(--glow-red);
+    font-weight: bold;
+    animation: blink 1s infinite;
+  }
+
+  .amber-line {
+    color: var(--amber);
+    text-shadow: var(--glow-amber);
+  }
+
+  .dim-line {
+    color: var(--green-dim);
+    font-size: 12px;
+  }
+
+  .bold-line {
+    color: #80ffaa;
+    text-shadow: 0 0 8px #80ffaa88;
+  }
+
+  @keyframes blink {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Choices */
+  .choices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+    max-height: 35vh; /* Previene que los botones expulsen contenido en móviles */
+    overflow-y: auto;
+  }
+  
+  .choices::-webkit-scrollbar { width: 6px; }
+  .choices::-webkit-scrollbar-thumb { background: var(--green-dark); }
+
+  .choice-btn {
+    background: rgba(0,255,65,0.05);
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    padding: 10px 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .choice-btn::before {
+    content: '▶ ';
+    color: var(--green-dim);
+  }
+
+  .choice-btn:hover {
+    background: rgba(0,255,65,0.15);
+    border-color: var(--green);
+    box-shadow: var(--glow);
+    color: #fff;
+  }
+
+  .choice-btn:active { transform: translateX(2px); }
+
+  .choice-btn.char-btn {
+    border-color: var(--amber);
+    color: var(--amber);
+    padding: 12px 16px;
+  }
+
+  .choice-btn.char-btn:hover {
+    background: rgba(255,179,0,0.1);
+    border-color: var(--amber);
+    box-shadow: var(--glow-amber);
+    color: #fff;
+  }
+
+  .char-name {
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    display: block;
+    color: var(--green);
+    margin-bottom: 2px;
+  }
+
+  .char-btn:hover .char-name { color: #fff; }
+
+  .char-role {
+    font-size: 11px;
+    color: var(--amber);
+    letter-spacing: 1px;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .char-ability {
+    font-size: 12px;
+    color: var(--green-dim);
+  }
+
+  /* Input */
+  .input-row {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    display: none;
+  }
+
+  .input-row.visible { display: flex; }
+
+  .crt-input {
+    flex: 1;
+    background: rgba(0,40,10,0.5);
+    border: 1px solid var(--green-dim);
+    border-bottom: 2px solid var(--green);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    padding: 10px 14px;
+    outline: none;
+  }
+
+  .crt-input:focus { border-color: var(--green); box-shadow: var(--glow); }
+
+  .crt-input::placeholder { color: var(--green-dark); }
+
+  .submit-btn {
+    background: var(--green-dark);
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-shadow: var(--glow);
+  }
+
+  .submit-btn:hover {
+    background: rgba(0,255,65,0.2);
+    box-shadow: var(--glow);
+    color: #fff;
+  }
+
+  /* Attempts indicator */
+  .attempts-indicator {
+    display: none;
+    font-size: 12px;
+    color: var(--green-dim);
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border: 1px solid var(--green-dark);
+    flex-shrink: 0;
+  }
+  .attempts-indicator.visible { display: block; }
+  .attempt-pip {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 1px solid var(--green-dim);
+    margin-right: 4px;
+    vertical-align: middle;
+    background: var(--green-dark);
+  }
+  .attempt-pip.used {
+    background: var(--red);
+    border-color: var(--red);
+    box-shadow: var(--glow-red);
+  }
+
+  /* Feedback */
+  .feedback-panel {
+    border: 1px solid;
+    padding: 10px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    flex-shrink: 0;
+    display: none;
+  }
+
+  .feedback-panel.success {
+    border-color: var(--green);
+    background: rgba(0,255,65,0.06);
+    color: #80ffaa;
+    display: block;
+  }
+
+  .feedback-panel.error {
+    border-color: var(--red);
+    background: rgba(255,26,26,0.06);
+    color: #ff8080;
+    display: block;
+    animation: shake 0.3s;
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+
+  /* Room title */
+  .room-title {
+    font-family: 'VT323', monospace;
+    font-size: 28px;
+    color: var(--amber);
+    text-shadow: var(--glow-amber);
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--amber);
+    padding-bottom: 6px;
+  }
+
+  /* Victory / Game Over */
+  .big-message {
+    font-family: 'VT323', monospace;
+    font-size: clamp(32px, 6vw, 70px);
+    text-align: center;
+    padding: 20px;
+    letter-spacing: 6px;
+    animation: flicker 3s infinite;
+  }
+
+  .big-message.victory { color: var(--green); text-shadow: var(--glow); }
+  .big-message.gameover { color: var(--red); text-shadow: var(--glow-red); }
+
+  .restart-btn {
+    display: block;
+    margin: 10px auto;
+    background: transparent;
+    border: 2px solid var(--green);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    padding: 10px 24px;
+    cursor: pointer;
+    letter-spacing: 3px;
+    text-shadow: var(--glow);
+    box-shadow: var(--glow);
+    transition: all 0.2s;
+  }
+
+  .restart-btn:hover {
+    background: rgba(0,255,65,0.15);
+    color: #fff;
+  }
+
+  /* Typewriter cursor */
+  .cursor {
+    display: inline-block;
+    width: 10px;
+    height: 16px;
+    background: var(--green);
+    animation: blink 0.7s infinite;
+    vertical-align: middle;
+    margin-left: 3px;
+  }
+
+  /* Loading overlay */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.8s;
+  }
+
+  #loading.hidden { opacity: 0; pointer-events: none; }
+
+  .loading-logo {
+    font-family: 'VT323', monospace;
+    font-size: 80px;
+    color: var(--green);
+    text-shadow: var(--glow);
+    letter-spacing: 8px;
+    animation: flicker 2s infinite;
+  }
+
+  .loading-text {
+    color: var(--green-dim);
+    font-size: 13px;
+    letter-spacing: 2px;
+    margin-top: 20px;
+  }
+
+  .loading-bar-wrap {
+    width: 300px;
+    height: 4px;
+    background: var(--green-dark);
+    margin-top: 16px;
+    border: 1px solid var(--green-dim);
+  }
+
+  .loading-bar-fill {
+    height: 100%;
+    background: var(--green);
+    box-shadow: var(--glow);
+    animation: load 2.5s ease-out forwards;
+  }
+
+  @keyframes load {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
+
+  /* Science formula styling */
+  .formula {
+    background: rgba(0,255,65,0.08);
+    border: 1px solid var(--green-dim);
+    padding: 8px 16px;
+    margin: 8px 0;
+    color: #aaffcc;
+    font-size: 14px;
+    display: block;
+  }
+
+  /* Room indicator */
+  .room-indicator {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .room-dot {
+    width: 28px;
+    height: 6px;
+    background: var(--green-dark);
+    border: 1px solid var(--green-dim);
+    transition: background 0.4s;
+  }
+
+  .room-dot.done { background: var(--green); box-shadow: var(--glow); }
+  .room-dot.active { background: var(--amber); box-shadow: var(--glow-amber); animation: blink 1.2s infinite; }
+
+  /* character portrait box */
+  .char-portrait {
+    font-family: 'VT323', monospace;
+    font-size: 11px;
+    color: var(--green-dim);
+    line-height: 1.2;
+    display: block;
+    margin-bottom: 6px;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loading-logo">К-86</div>
+  <div class="loading-text">INICIANDO TERMINAL PRINCIPAL... KOSMOS-86 v4.1.1</div>
+  <div class="loading-bar-wrap"><div class="loading-bar-fill"></div></div>
+</div>
+
+<div id="app">
+  <div class="crt-header">
+    <div class="title-main">KOSMOS-86</div>
+    <div class="title-sub">⚠ Emergencia Atompunk ⚠</div>
+  </div>
+
+  <div class="hud" id="hud" style="display:none">
+    <div class="hud-panel">
+      <div class="hud-label">☢ RAD-METER</div>
+      <div class="hud-value" id="rad-val">0 mSv</div>
+      <div class="progress-bar"><div class="progress-fill" id="rad-bar" style="width:0%"></div></div>
+    </div>
+    <div class="hud-panel">
+      <div class="hud-label">⚡ PRESIÓN DEL SISTEMA</div>
+      <div class="hud-value" id="pres-val">50%</div>
+      <div class="progress-bar"><div class="progress-fill" id="pres-bar" style="width:50%"></div></div>
+    </div>
+  </div>
+
+  <div class="inventory-panel" id="inv-panel" style="display:none">
+    <span class="inventory-label">■ INVENTARIO:</span>
+    <span id="inv-items"><span style="color:var(--green-dark)">[ vacío ]</span></span>
+  </div>
+
+  <div class="room-indicator" id="room-dots" style="display:none">
+    <div class="room-dot" id="dot-0"></div>
+    <div class="room-dot" id="dot-1"></div>
+    <div class="room-dot" id="dot-2"></div>
+    <div class="room-dot" id="dot-3"></div>
+  </div>
+
+  <div id="char-display" style="display:none; color:var(--amber); font-size:13px; letter-spacing:1px; flex-shrink: 0;"></div>
+
+  <div class="terminal">
+    <div class="terminal-text" id="output"></div>
+  </div>
+
+  <div class="attempts-indicator" id="attempts-indicator">
+    INTENTOS RESTANTES: <span id="attempt-pips"></span>
+  </div>
+
+  <div class="feedback-panel" id="feedback"></div>
+
+  <div class="choices" id="choices"></div>
+
+  <div class="input-row" id="input-row">
+    <input type="text" class="crt-input" id="user-input" placeholder="Introduce tu respuesta..." autocomplete="off">
+    <button class="submit-btn" id="submit-btn">ENVIAR</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// KOSMOS-86: EMERGENCIA ATOMPUNK
+// Motor de juego principal
+// ═══════════════════════════════════════════════
+
+const STATE = {
+  rad: 0,
+  pressure: 50,
+  inventory: [],
+  character: null,
+  room: 0,
+  phase: 'intro',   // intro | charselect | room1 | room2 | room3 | room4 | victory | gameover
+  attemptsRoom: 0,
+  questionAttempts: 0,  // attempts on current individual question
+  maxAttempts: 2,       // max attempts per question before showing solution
+};
+
+const CHARS = {
+  volkov: {
+    id: 'volkov',
+    name: 'CAMARADA VOLKOV',
+    role: 'Especialista en Núcleos — Rango: Mayor',
+    ability: '☢ Reducción del daño por radiación un 20%. Sabe posicionarse ante fuentes emisoras.',
+    portrait: [
+      '  ┌──────┐',
+      '  │ ◉  ◉│',
+      '  │  ──  │',
+      '  │ ████ │',
+      '  └──────┘',
+    ],
+    radReduction: 0.8,
+  },
+  petrova: {
+    id: 'petrova',
+    name: 'CAMARADA PETROVA',
+    role: 'Ingeniera de Fluidos — Rango: Capitán',
+    ability: '⚙ Ve datos exactos de presión y temperatura en tuberías. La física de los fluidos no tiene secretos.',
+    portrait: [
+      '  ┌──────┐',
+      '  │ ◈  ◈│',
+      '  │  ~~  │',
+      '  │ ████ │',
+      '  └──────┘',
+    ],
+    radReduction: 1.0,
+  },
+  kamenev: {
+    id: 'kamenev',
+    name: 'CAMARADA KAMENEV',
+    role: 'Mecánico de Automatismos — Rango: Teniente',
+    ability: '⚙ Resuelve mejor los problemas de cinemática y fuerzas de los rovers soviéticos.',
+    portrait: [
+      '  ┌──────┐',
+      '  │ ▣  ▣│',
+      '  │  ▬▬  │',
+      '  │ ████ │',
+      '  └──────┘',
+    ],
+    radReduction: 1.0,
+  },
+};
+
+// DOM refs
+const output = document.getElementById('output');
+const choices = document.getElementById('choices');
+const feedback = document.getElementById('feedback');
+const inputRow = document.getElementById('input-row');
+const userInput = document.getElementById('user-input');
+const submitBtn = document.getElementById('submit-btn');
+const hud = document.getElementById('hud');
+const invPanel = document.getElementById('inv-panel');
+const roomDots = document.getElementById('room-dots');
+const charDisplay = document.getElementById('char-display');
+const attemptsIndicator = document.getElementById('attempts-indicator');
+const attemptPips = document.getElementById('attempt-pips');
+
+// ─── Typewriter ───────────────────────────────
+function setOutput(html) {
+  output.innerHTML = html;
+  // Modificación importante: auto-scroll al inicio del terminal
+  document.querySelector('.terminal').scrollTop = 0; 
+}
+
+// ─── HUD ──────────────────────────────────────
+function updateHUD() {
+  const radEl = document.getElementById('rad-val');
+  const radBar = document.getElementById('rad-bar');
+  const presEl = document.getElementById('pres-val');
+  const presBar = document.getElementById('pres-bar');
+
+  radEl.textContent = STATE.rad + ' mSv';
+  radBar.style.width = Math.min(STATE.rad, 100) + '%';
+  radBar.className = 'progress-fill rad';
+
+  if (STATE.rad >= 70) {
+    radEl.className = 'hud-value danger';
+  } else if (STATE.rad >= 40) {
+    radEl.className = 'hud-value warning';
+  } else {
+    radEl.className = 'hud-value';
+  }
+
+  presEl.textContent = STATE.pressure + '%';
+  presBar.style.width = Math.min(STATE.pressure, 100) + '%';
+
+  if (STATE.pressure >= 75 || STATE.pressure <= 25) {
+    presEl.className = 'hud-value danger';
+    presBar.className = 'progress-fill pressure-high';
+  } else if (STATE.pressure >= 65 || STATE.pressure <= 35) {
+    presEl.className = 'hud-value warning';
+    presBar.className = 'progress-fill pressure-high';
+  } else {
+    presEl.className = 'hud-value';
+    presBar.className = 'progress-fill';
+  }
+
+  // Inventory
+  const invItems = document.getElementById('inv-items');
+  if (STATE.inventory.length === 0) {
+    invItems.innerHTML = '<span style="color:var(--green-dark)">[ vacío ]</span>';
+  } else {
+    invItems.innerHTML = STATE.inventory.map(i => `<span class="inv-item">${i}</span>`).join('');
+  }
+
+  // Room dots
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById('dot-' + i);
+    if (!dot) continue;
+    dot.className = 'room-dot';
+    if (i < STATE.room) dot.classList.add('done');
+    if (i === STATE.room) dot.classList.add('active');
+  }
+}
+
+function showHUD() {
+  hud.style.display = 'grid';
+  invPanel.style.display = 'block';
+  roomDots.style.display = 'flex';
+  charDisplay.style.display = 'block';
+}
+
+function addRad(amount) {
+  const mod = STATE.character ? CHARS[STATE.character].radReduction : 1.0;
+  STATE.rad = Math.min(100, Math.round(STATE.rad + amount * mod));
+  updateHUD();
+  if (STATE.rad >= 100) { triggerGameOver('rad'); }
+}
+
+function addPressure(amount) {
+  STATE.pressure = Math.min(100, Math.max(0, STATE.pressure + amount));
+  updateHUD();
+  if (STATE.pressure >= 100 || STATE.pressure <= 0) { triggerGameOver('pressure'); }
+}
+
+function addItem(item) {
+  if (!STATE.inventory.includes(item)) STATE.inventory.push(item);
+  updateHUD();
+}
+
+
+// ─── Attempts ─────────────────────────────────
+function resetQuestionAttempts() {
+  STATE.questionAttempts = 0;
+  attemptsIndicator.className = 'attempts-indicator';
+  updateAttemptPips();
+}
+
+function updateAttemptPips() {
+  let html = '';
+  for (let i = 0; i < STATE.maxAttempts; i++) {
+    const used = i < STATE.questionAttempts;
+    html += `<span class="attempt-pip${used ? ' used' : ''}"></span>`;
+  }
+  attemptPips.innerHTML = html;
+}
+
+function showAttempts() {
+  attemptsIndicator.className = 'attempts-indicator visible';
+  updateAttemptPips();
+}
+
+function hideAttempts() {
+  attemptsIndicator.className = 'attempts-indicator';
+}
+
+// ─── Choices ─────────────────────────────────
+function setChoices(arr) {
+  choices.innerHTML = '';
+  inputRow.classList.remove('visible');
+  arr.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn' + (opt.cls ? ' ' + opt.cls : '');
+    btn.innerHTML = opt.label;
+    btn.onclick = opt.action;
+    choices.appendChild(btn);
+  });
+}
+
+function clearChoices() { choices.innerHTML = ''; }
+function showInput(placeholder) {
+  clearChoices();
+  resetQuestionAttempts();
+  showAttempts();
+  inputRow.classList.add('visible');
+  userInput.placeholder = placeholder || 'Introduce tu respuesta...';
+  userInput.value = '';
+  userInput.focus();
+}
+
+function setFeedback(type, html) {
+  feedback.className = 'feedback-panel ' + type;
+  feedback.innerHTML = html;
+  // Eliminado el scrollIntoView para no forzar saltos de vista en la ventana estática
+}
+function clearFeedback() {
+  feedback.className = 'feedback-panel';
+  feedback.innerHTML = '';
+}
+
+// ─── Game Over / Victory ─────────────────────
+function triggerGameOver(reason) {
+  STATE.phase = 'gameover';
+  clearChoices();
+  inputRow.classList.remove('visible');
+  hideAttempts();
+  clearFeedback();
+  let msg = '';
+  if (reason === 'rad') {
+    msg = `<div class="big-message gameover">☢ CONTAMINACIÓN FATAL ☢</div>
+<p style="text-align:center;color:var(--red);margin-bottom:16px;">El camarada ${CHARS[STATE.character].name.split(' ')[1]} ha superado los 100 mSv de exposición. El reactor os ha reclamado a ambos.</p>`;
+  } else {
+    msg = `<div class="big-message gameover">⚡ COLAPSO DE SISTEMA ⚡</div>
+<p style="text-align:center;color:var(--red);margin-bottom:16px;">La presión del sistema ha alcanzado valores críticos. La instalación KOSMOS-86 se ha sellado automáticamente.</p>`;
+  }
+  setOutput(msg + `<p style="text-align:center;color:var(--green-dim);font-size:13px;">KOSMOS-86 registra el incidente en el archivo central.<br>La ciencia siempre puede intentarse de nuevo, camarada.</p>`);
+  choices.innerHTML = `<button class="restart-btn" onclick="startGame()">▶ REINICIAR MISIÓN</button>`;
+}
+
+function triggerVictory() {
+  STATE.phase = 'victory';
+  clearChoices();
+  inputRow.classList.remove('visible');
+  clearFeedback();
+  setOutput(`
+<div class="big-message victory">★ MISIÓN CUMPLIDA ★</div>
+<div style="text-align:center;padding:10px 0;color:#80ffaa;line-height:2">
+<span class="amber-line">KOSMOS-86 ha sido estabilizado gracias al conocimiento científico aplicado.</span><br><br>
+<span class="dim-line">Rad-Meter final: ${STATE.rad} mSv / 100 mSv</span><br>
+<span class="dim-line">Presión final: ${STATE.pressure}%</span><br>
+<span class="dim-line">Inventario: ${STATE.inventory.join(', ') || 'vacío'}</span><br><br>
+<span style="color:var(--green);font-size:15px;">LA CIENCIA, LA RAZÓN Y EL COLECTIVO HAN PREVALECIDO.</span><br>
+<span class="dim-line">— ZVEZDA-1, IA del Bunker Principal —</span>
+</div>`);
+  choices.innerHTML = `<button class="restart-btn" onclick="startGame()">▶ NUEVA MISIÓN</button>`;
+}
+
+// ══════════════════════════════════════════════
+// INTRODUCCIÓN
+// ══════════════════════════════════════════════
+function showIntro() {
+  STATE.phase = 'intro';
+  clearFeedback();
+  clearChoices();
+  inputRow.classList.remove('visible');
+
+  setOutput(`<span class="dim-line">█████████████████████████████████████████████████████████
+  TERMINAL PRINCIPAL — COMPLEJO NUCLEAR KOSMOS-86
+  UBICACIÓN: [CLASIFICADO] REGIÓN DE LOS URALES — 1986
+  ESTADO DEL SISTEMA: <span class="alert-line">⚠ EMERGENCIA NIVEL ROJO ⚠</span>
+█████████████████████████████████████████████████████████</span>
+
+<span class="amber-line">[03:47 hrs] — Las alarmas de fósforo rojo llevan 12 minutos activas.</span>
+
+Los tubos de vacío del sistema de control central parpadean de forma errática. El ventilador analógico número 7 gira más despacio. En la pantalla verde del terminal principal, un cursor rectangular late como un corazón enfermo.
+
+<span class="bold-line">La voz metálica de ZVEZDA-1</span> —la Inteligencia Artificial analógica que gestiona el complejo— atraviesa los altavoces de válvulas con un zumbido inconfundible:
+
+<span class="formula">ZVEZDA-1 // MENSAJE DE EMERGENCIA GRABADO:
+"Camaradas... se ha producido una fuga en el Búnker de Control.
+ Los sistemas de sellado automático han fallado.
+ Los cuatro sectores del complejo están en estado crítico.
+ Se requiere intervención manual inmediata.
+ Sin conocimiento científico... KOSMOS-86 no sobrevivirá."</span>
+
+<span class="amber-line">Fuera, el viento siberiano arrastra vapor radiactivo entre las torres de enfriamiento. 
+El reloj de la pared —mecánico, soviético, inquebrantable— marca las 03:48.</span>
+
+<span class="dim-line">Tenéis que atravesar 4 sectores del complejo aplicando vuestros conocimientos
+de Física y Química. Cada error tiene consecuencias. Cada acierto, os acerca a casa.</span>
+
+<span class="alert-line">█ EL RAD-METER COMIENZA A VIBRAR █</span>
+
+<span class="bold-line">¿Quién entrará al complejo?</span>
+`);
+
+  setChoices([
+    {
+      label: `<span class="char-portrait">${CHARS.volkov.portrait.join('\n')}</span><span class="char-name">CAMARADA VOLKOV</span><span class="char-role">${CHARS.volkov.role}</span><span class="char-ability">${CHARS.volkov.ability}</span>`,
+      cls: 'char-btn',
+      action: () => selectChar('volkov'),
+    },
+    {
+      label: `<span class="char-portrait">${CHARS.petrova.portrait.join('\n')}</span><span class="char-name">CAMARADA PETROVA</span><span class="char-role">${CHARS.petrova.role}</span><span class="char-ability">${CHARS.petrova.ability}</span>`,
+      cls: 'char-btn',
+      action: () => selectChar('petrova'),
+    },
+    {
+      label: `<span class="char-portrait">${CHARS.kamenev.portrait.join('\n')}</span><span class="char-name">CAMARADA KAMENEV</span><span class="char-role">${CHARS.kamenev.role}</span><span class="char-ability">${CHARS.kamenev.ability}</span>`,
+      cls: 'char-btn',
+      action: () => selectChar('kamenev'),
+    },
+  ]);
+}
+
+// ══════════════════════════════════════════════
+// SELECCIÓN DE PERSONAJE
+// ══════════════════════════════════════════════
+function selectChar(id) {
+  STATE.character = id;
+  STATE.rad = 0;
+  STATE.pressure = 50;
+  STATE.inventory = [];
+  STATE.room = 0;
+  STATE.attemptsRoom = 0;
+  const c = CHARS[id];
+  showHUD();
+  charDisplay.innerHTML = `■ OPERATIVO: <span style="color:var(--green)">${c.name}</span> — <span style="color:var(--green-dim)">${c.role}</span>`;
+  updateHUD();
+  clearFeedback();
+  showRoom1();
+}
+
+// ══════════════════════════════════════════════
+// SALA 1: BUNKER DE CONTROL — ESTRUCTURA ATÓMICA Y RADIACTIVIDAD
+// ══════════════════════════════════════════════
+function showRoom1() {
+  STATE.phase = 'room1';
+  STATE.room = 0;
+  STATE.attemptsRoom = 0;
+  STATE.questionAttempts = 0;
+  updateHUD();
+  clearFeedback();
+
+  setOutput(`<div class="room-title">◈ SALA 1: EL BÚNKER DE CONTROL ◈</div>
+
+<span class="dim-line">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+
+La puerta de acero del búnker lleva el sello soviético y la leyenda <span class="amber-line">«РАДИАЦИЯ — ZONA RESTRINGIDA»</span>. 
+El contador Geiger analógico que llevas chirría de forma intermitente.
+
+ZVEZDA-1 proyecta texto en el terminal de entrada:
+
+<span class="formula">ZVEZDA-1 // DIAGNÓSTICO DE FUGA:
+  Sensor 4-A detecta emisión de partículas NO IDENTIFICADAS.
+  Datos disponibles:
+  ─────────────────────────────────────────────
+  ISÓTOPO CANDIDATO A:  Número másico (A) = 235, Z = 92
+  ISÓTOPO CANDIDATO B:  Número másico (A) = 131, Z = 53
+  ISÓTOPO CANDIDATO C:  Número másico (A) = 137, Z = 55
+  ─────────────────────────────────────────────
+  Tipo de emisión detectada por sensor: PARTÍCULA BETA (β⁻)
+  ─────────────────────────────────────────────
+  ACCIÓN REQUERIDA: Identificar isótopo. Elegir blindaje correcto.
+  Tiempo restante antes de sellado permanente: CRÍTICO</span>
+
+<span class="amber-line">La puerta sólo se abrirá si identificas correctamente el isótopo emisor 
+de partículas β y el material de blindaje adecuado.</span>
+
+<span class="formula">◈ ARCHIVO TÉCNICO — ZVEZDA-1 // TEORÍA: ESTRUCTURA ATÓMICA
+  ─────────────────────────────────────────────────────────
+  ■ NÚMERO ATÓMICO (Z): número de PROTONES del núcleo.
+    Identifica el elemento en la tabla periódica.
+    Ej: Z=92 → Uranio | Z=53 → Yodo | Z=55 → Cesio
+
+  ■ NÚMERO MÁSICO (A): PROTONES + NEUTRONES del núcleo.
+    A = Z + N  →  N (neutrones) = A − Z
+
+  ■ ISÓTOPOS: átomos del mismo elemento (mismo Z)
+    con distinto número de neutrones (distinto A).
+    Pueden ser estables o RADIACTIVOS.
+
+  ■ TIPOS DE EMISIÓN RADIACTIVA:
+    · Alfa (α): núcleo de He (2p + 2n). Poco penetrante.
+    · Beta (β⁻): electrón del núcleo (n → p + e⁻ + ν̄).
+      Penetra más que alfa. El sensor detecta BETA.
+    · Gamma (γ): radiación electromagnética. Muy penetrante.
+
+  ■ CÓMO IDENTIFICAR EL ISÓTOPO:
+    Usa el número atómico (Z) para saber qué elemento es.
+    Comprueba qué tipo de emisión produce ese isótopo:
+    no todos los elementos radiactivos emiten lo mismo.
+    Algunos emiten solo alfa, otros beta, otros ambas.
+    El sensor detecta EXCLUSIVAMENTE β⁻ en esta fuga.
+
+  ■ PERÍODO DE SEMIDESINTEGRACIÓN:
+    Es el tiempo que tarda la mitad de los núcleos en
+    desintegrarse. Influye en la peligrosidad a largo plazo
+    y en si un isótopo es propio de un reactor industrial
+    o de uso médico de corta duración.
+  ─────────────────────────────────────────────────────────</span>
+
+<span class="bold-line">PARTE 1:</span> ¿Cuál de estos isótopos es el responsable de la fuga?
+Analiza qué tipo de emisión detecta el sensor y qué elementos corresponden a cada Z.
+Piensa en cuál de los tres candidatos es un producto típico de fisión en reactores industriales.
+`);
+
+  setChoices([
+    { label: 'A) Uranio-235 (Z=92, A=235) — Emisor beta conocido', action: () => room1Part1('A') },
+    { label: 'B) Yodo-131 (Z=53, A=131) — Emisor beta y gamma, usado en medicina', action: () => room1Part1('B') },
+    { label: 'C) Cesio-137 (Z=55, A=137) — Emisor beta, frecuente en accidentes nucleares', action: () => room1Part1('C') },
+  ]);
+}
+
+function room1Part1(answer) {
+  clearFeedback();
+  if (answer === 'C') {
+    // Correcto: Cs-137 es un emisor beta clásico de accidentes nucleares
+    setFeedback('success', `
+<span style="color:var(--green)">★ CORRECTO, CAMARADA ★</span><br><br>
+<strong>Cesio-137</strong> (Z=55, A=137): El isótopo correcto. Es un producto de fisión del uranio con período de semidesintegración de ~30 años. 
+Su núcleo tiene 55 protones y 82 neutrones. Es un <strong>emisor beta (β⁻)</strong> protagonista del accidente de Chernóbil y otros incidentes nucleares graves.<br><br>
+El <strong>Número Atómico Z</strong> identifica el elemento (Z=55 → Cesio). El <strong>Número Másico A</strong> es la suma de protones y neutrones: A = Z + N, por tanto N = 137 − 55 = 82 neutrones.<br><br>
+<span class="dim-line">ZVEZDA-1: "Isótopo confirmado. Procediendo a PARTE 2..."</span>
+`);
+    setTimeout(() => room1Part2(), 1800);
+  } else {
+    STATE.attemptsRoom++;
+    STATE.questionAttempts++;
+    updateAttemptPips();
+    addRad(15);
+    const exp = answer === 'A'
+      ? 'El Uranio-235 emite principalmente partículas <strong>alfa (α)</strong>, no beta. Su Z=92 lo identifica como Uranio, presente en combustible, pero no es el emisor beta de esta fuga.'
+      : 'El Yodo-131 sí emite beta, pero también gamma. Sin embargo, el sensor indica exclusivamente beta. Además, el Yodo-131 tiene un período corto (8 días) y se usa en medicina; es menos probable en esta fuga industrial.';
+
+    if (STATE.questionAttempts >= STATE.maxAttempts) {
+      hideAttempts();
+      clearChoices();
+      setFeedback('error', `
+<span style="color:var(--red)">✖ INTENTOS AGOTADOS — FUGA DESCONTROLADA</span><br><br>
+${exp}<br><br>
+<span style="color:var(--amber)">★ SOLUCIÓN: La respuesta correcta era <strong>C) Cesio-137</strong>.<br>
+Es el isótopo emisor beta (β⁻) más común en accidentes de reactores de fisión, con Z=55 y 82 neutrones.</span><br><br>
+<span class="dim-line">ZVEZDA-1 activa el protocolo de emergencia. Avanzando a la siguiente fase...</span>
+`);
+      addRad(20);
+      setTimeout(() => room1Part2(), 3000);
+    } else {
+      setFeedback('error', `
+<span style="color:var(--red)">✖ ERROR — +15 mSv ABSORBIDOS (Intento ${STATE.questionAttempts}/${STATE.maxAttempts})</span><br><br>
+${exp}<br><br>
+<span class="dim-line">Te queda ${STATE.maxAttempts - STATE.questionAttempts} intento(s).</span>
+`);
+      setChoices([
+        { label: 'A) Uranio-235 (Z=92, A=235)', action: () => room1Part1('A') },
+        { label: 'B) Yodo-131 (Z=53, A=131)', action: () => room1Part1('B') },
+        { label: 'C) Cesio-137 (Z=55, A=137)', action: () => room1Part1('C') },
+      ]);
+    }
+  }
+}
+
+function room1Part2() {
+  resetQuestionAttempts();
+  clearFeedback();
+  setOutput(`<div class="room-title">◈ SALA 1: PARTE 2 — BLINDAJE ◈</div>
+
+<span class="formula">ZVEZDA-1 // ALMACÉN DE MATERIALES:
+  Disponibles en bunker de emergencia:
+  ─── [A] HOJA DE PAPEL (2 mm)
+  ─── [B] PLACA DE ALUMINIO (3 mm)
+  ─── [C] BLOQUE DE PLOMO (5 cm)
+  ─────────────────────────────────────────────
+  Emisión confirmada: PARTÍCULA BETA (β⁻)
+  Pregunta: ¿Cuál es el blindaje mínimo eficaz?</span>
+
+<span class="formula">◈ ARCHIVO TÉCNICO — ZVEZDA-1 // TEORÍA: BLINDAJE RADIACTIVO
+  ─────────────────────────────────────────────────────────
+  El poder de penetración de cada tipo de radiación
+  determina qué material es necesario para detenerla:
+
+  · Alfa (α)  →  se detiene con papel o la propia piel.
+                 Apenas penetra unos centímetros de aire.
+
+  · Beta (β)  →  se detiene con planchas de ALUMINIO
+                 o plástico de pocos milímetros.
+                 Penetra más que alfa pero menos que gamma.
+
+  · Gamma (γ) →  requiere PLOMO grueso u hormigón denso.
+                 Es radiación electromagnética de alta energía.
+
+  ■ REGLA PRÁCTICA: usar el blindaje mínimo suficiente.
+    Usar un blindaje más potente del necesario es seguro,
+    pero ineficiente en una emergencia (peso, disponibilidad).
+    Usar un blindaje insuficiente es peligroso.
+    Elige el material más ligero que sea capaz de detener
+    completamente la radiación detectada.
+  ─────────────────────────────────────────────────────────</span>
+
+<span class="amber-line">Emisión confirmada: BETA (β⁻). Consulta la tabla de penetración y elige el blindaje correcto.</span>
+
+<span class="bold-line">¿Qué material usarás para detener la emisión beta?</span>
+`);
+  setChoices([
+    { label: 'A) Papel — fino y portátil', action: () => room1Part2Answer('A') },
+    { label: 'B) Aluminio — placa metálica ligera', action: () => room1Part2Answer('B') },
+    { label: 'C) Plomo — blindaje máximo', action: () => room1Part2Answer('C') },
+  ]);
+}
+
+function room1Part2Answer(ans) {
+  clearFeedback();
+  if (ans === 'B') {
+    // Aluminio detiene beta
+    addItem('Placa de Aluminio');
+    setFeedback('success', `
+<span style="color:var(--green)">★ BLINDAJE CORRECTO ★</span><br><br>
+<strong>El Aluminio</strong> es el blindaje estándar para partículas <strong>beta (β)</strong>:<br>
+• Alfa (α): detenida por papel o piel.<br>
+• <strong>Beta (β): detenida por aluminio o plástico de pocos mm.</strong><br>
+• Gamma (γ): requiere plomo grueso u hormigón.<br><br>
+Has añadido la <span class="amber-line">Placa de Aluminio</span> a tu inventario. La puerta del búnker se desbloquea con un golpe sordo de pistón hidráulico.<br><br>
+<span class="dim-line">ZVEZDA-1: "Acceso concedido. Nivel de radiación local descendiendo. Avanza al siguiente sector."</span>
+`);
+    setTimeout(() => {
+      STATE.room = 1;
+      updateHUD();
+      showRoom2();
+    }, 2500);
+  } else {
+    STATE.attemptsRoom++;
+    STATE.questionAttempts++;
+    updateAttemptPips();
+    addRad(20);
+    const exp = ans === 'A'
+      ? 'El papel detiene partículas <strong>alfa (α)</strong> pero es insuficiente para la beta. Las partículas beta tienen mayor poder de penetración.'
+      : 'El plomo es excelente para rayos <strong>gamma (γ)</strong>, pero es innecesariamente pesado para beta. Para beta basta el aluminio. Aplicar el principio de proporcionalidad en radioprotección es esencial.';
+
+    if (STATE.questionAttempts >= STATE.maxAttempts) {
+      hideAttempts();
+      clearChoices();
+      setFeedback('error', `
+<span style="color:var(--red)">✖ INTENTOS AGOTADOS — BLINDAJE FALLIDO</span><br><br>
+${exp}<br><br>
+<span style="color:var(--amber)">★ SOLUCIÓN: La respuesta correcta era <strong>B) Aluminio</strong>.<br>
+Alfa → papel. <strong>Beta → aluminio.</strong> Gamma → plomo.</span><br><br>
+<span class="dim-line">ZVEZDA-1 sella el sector por protocolo. Avanzando...</span>
+`);
+      addRad(15);
+      setTimeout(() => { STATE.room = 1; updateHUD(); showRoom2(); }, 3000);
+    } else {
+      setFeedback('error', `<span style="color:var(--red)">✖ FALLO DE BLINDAJE — +20 mSv (Intento ${STATE.questionAttempts}/${STATE.maxAttempts})</span><br><br>${exp}<br><br><span class="dim-line">Te queda ${STATE.maxAttempts - STATE.questionAttempts} intento(s).</span>`);
+      setChoices([
+        { label: 'A) Papel', action: () => room1Part2Answer('A') },
+        { label: 'B) Aluminio', action: () => room1Part2Answer('B') },
+        { label: 'C) Plomo', action: () => room1Part2Answer('C') },
+      ]);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+// SALA 2: COLECTORES DE GAS — LEYES DE LOS GASES
+// ══════════════════════════════════════════════
+function showRoom2() {
+  resetQuestionAttempts();
+  STATE.phase = 'room2';
+  STATE.attemptsRoom = 0;
+  updateHUD();
+  clearFeedback();
+
+  const boyleHint = STATE.character === 'petrova'
+    ? `\n<span class="amber-line">PETROVA detecta en sus instrumentos: T₁ = T₂ (proceso isotérmico). Aplica Boyle-Mariotte.</span>` : '';
+
+  setOutput(`<div class="room-title">◈ SALA 2: SALA DE COLECTORES DE GAS ◈</div>
+
+<span class="dim-line">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+
+Pasas al sector de colectores. El calor es sofocante. Enormes pistones hidráulicos de hierro gris golpean rítmicamente. Los manómetros analógicos —circulares, con agujas negras sobre fondo crema— oscilan peligrosamente.
+
+Un técnico robotizado analógico se acerca con una tarjeta perforada:
+
+<span class="formula">ZVEZDA-1 // ALERTA DE VÁLVULAS:
+  COLECTOR 7-B — DATOS ACTUALES:
+  ─────────────────────────────────────────────
+  GAS: Nitrógeno (N₂) — considerado gas ideal
+  P₁ = 2 atm
+  V₁ = 10 L
+  T₁ = 300 K  →  nuevo estado: T₂ = 300 K (sin cambio de temperatura)
+  V₂ = 5 L   (el pistón ha comprimido el gas a la mitad)
+  ─────────────────────────────────────────────
+  ¿Cuál es la nueva presión P₂?
+  Purga correcta: válvula con P₂ calculada.
+  ERROR: sobrepresión → explosión. Subpresión → implosión.</span>
+${boyleHint}
+
+<span class="formula">◈ ARCHIVO TÉCNICO — ZVEZDA-1 // TEORÍA: LEYES DE LOS GASES
+  ─────────────────────────────────────────────────────────
+  Un GAS IDEAL es un modelo en el que las moléculas no
+  interaccionan entre sí y ocupan volumen despreciable.
+  El nitrógeno a baja presión se comporta como gas ideal.
+
+  ■ LEY DE BOYLE-MARIOTTE (T = constante):
+    Si la temperatura no cambia, presión y volumen
+    son inversamente proporcionales:
+
+        P₁ · V₁ = P₂ · V₂
+
+    → Si el volumen BAJA a la mitad, la presión SUBE al doble.
+    → Si el volumen SUBE al doble, la presión BAJA a la mitad.
+
+  ■ CÓMO RESOLVER:
+    1. Escribe la ecuación de Boyle-Mariotte.
+    2. Identifica la incógnita (P₂) y despéjala.
+    3. Sustituye los valores del colector y opera.
+
+  ■ UNIDADES: P en atm (o Pa), V en litros (o m³).
+    Comprueba que usas las mismas unidades en ambos lados.
+
+  ■ COMPROBACIÓN INTUITIVA:
+    Si el volumen disminuye, ¿qué debería pasar con la presión?
+    Piensa en las moléculas: en menos espacio, chocan más.
+  ─────────────────────────────────────────────────────────</span>
+
+<span class="bold-line">Aplica la Ley de Boyle-Mariotte con los datos del colector e introduce P₂ en atm:</span>
+`);
+  showInput('Escribe la presión en atm (ej: 4)');
+  submitBtn.onclick = room2CheckAnswer;
+  userInput.onkeydown = (e) => { if(e.key==='Enter') room2CheckAnswer(); };
+}
+
+function room2CheckAnswer() {
+  const val = parseFloat(userInput.value.replace(',','.'));
+  clearFeedback();
+  if (isNaN(val)) { setFeedback('error', 'Introduce un número válido.'); return; }
+
+  if (Math.abs(val - 4) < 0.05) {
+    addItem('Tarjeta de Acceso 7-B');
+    inputRow.classList.remove('visible');
+    hideAttempts();
+    setFeedback('success', `
+<span style="color:var(--green)">★ PRESIÓN CORRECTA: 4 atm ★</span><br><br>
+<strong>Resolución:</strong><br>
+Ley de Boyle-Mariotte (T constante): <strong>P₁·V₁ = P₂·V₂</strong><br>
+2 atm × 10 L = P₂ × 5 L<br>
+P₂ = 20 / 5 = <strong>4 atm</strong><br><br>
+Al reducirse el volumen a la mitad, la presión se dobla. La válvula 7-B se purga con un silbido controlado. 
+Has obtenido la <span class="amber-line">Tarjeta de Acceso 7-B</span>.<br><br>
+<span class="dim-line">ZVEZDA-1: "Presión normalizada. Pistons estabilizados. Acceso a Sala 3 desbloqueado."</span>
+`);
+    setTimeout(() => {
+      STATE.room = 2;
+      updateHUD();
+      showRoom3();
+    }, 2800);
+  } else {
+    STATE.attemptsRoom++;
+    STATE.questionAttempts++;
+    updateAttemptPips();
+    const delta = val > 4 ? 12 : 10;
+    addPressure(delta);
+    addRad(8);
+
+    if (STATE.questionAttempts >= STATE.maxAttempts) {
+      inputRow.classList.remove('visible');
+      hideAttempts();
+      setFeedback('error', `
+<span style="color:var(--red)">✖ INTENTOS AGOTADOS — COLECTOR PURGADO DE EMERGENCIA</span><br><br>
+Tu respuesta: <strong>${val} atm</strong>.<br><br>
+<span style="color:var(--amber)">★ SOLUCIÓN: P₂ = <strong>4 atm</strong><br>
+Ley de Boyle-Mariotte (T=cte): P₁·V₁ = P₂·V₂<br>
+2 atm × 10 L = P₂ × 5 L → P₂ = 20/5 = <strong>4 atm</strong></span><br><br>
+<span class="dim-line">Al reducir el volumen a la mitad, la presión se duplica. ZVEZDA-1 purga manualmente. Avanzando...</span>
+`);
+      addPressure(10);
+      setTimeout(() => { STATE.room = 2; updateHUD(); showRoom3(); }, 3000);
+    } else {
+      setFeedback('error', `
+<span style="color:var(--red)">✖ PRESIÓN INCORRECTA — +${delta}% (Intento ${STATE.questionAttempts}/${STATE.maxAttempts})</span><br><br>
+Tu respuesta: <strong>${val} atm</strong>.<br>
+Recuerda: <strong>P₁·V₁ = P₂·V₂</strong> (T constante). 2×10 = P₂×5<br>
+<span class="dim-line">Te queda ${STATE.maxAttempts - STATE.questionAttempts} intento(s).</span>
+`);
+      userInput.value = '';
+      userInput.focus();
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+// SALA 3: REACTOR AUXILIAR — ESTEQUIOMETRÍA
+// ══════════════════════════════════════════════
+function showRoom3() {
+  resetQuestionAttempts();
+  STATE.phase = 'room3';
+  STATE.attemptsRoom = 0;
+  updateHUD();
+  clearFeedback();
+
+  setOutput(`<div class="room-title">◈ SALA 3: REACTOR DE SÍNTESIS AUXILIAR ◈</div>
+
+<span class="dim-line">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+
+El reactor auxiliar huele a ácido. Grandes depósitos de vidrio borosilicado —fabricados en la fábrica de Leningrado— contienen líquidos de colores inquietantes. El sistema de refrigeración primario usa una solución de <strong>ácido clorhídrico diluido (HCl)</strong> y hay que neutralizarlo urgentemente con <strong>hidróxido de sodio (NaOH)</strong> antes de que corroa las tuberías de aleación soviética.
+
+<span class="formula">ZVEZDA-1 // LABORATORIO DE SÍNTESIS:
+  REACCIÓN DE NEUTRALIZACIÓN PROPUESTA:
+  ─────────────────────────────────────────────
+  __ HCl  +  __ NaOH  →  __ NaCl  +  __ H₂O
+  ─────────────────────────────────────────────
+  Se dispone de 2 moles de HCl.
+  ¿Cuántos moles de NaOH se necesitan para neutralizarlo?</span>
+
+<span class="formula">◈ ARCHIVO TÉCNICO — ZVEZDA-1 // TEORÍA: ESTEQUIOMETRÍA
+  ─────────────────────────────────────────────────────────
+  ■ AJUSTE DE ECUACIONES QUÍMICAS:
+    Una ecuación está ajustada cuando el número de átomos
+    de cada elemento es igual en reactivos y productos.
+    Los números que multiplican a cada fórmula se llaman
+    COEFICIENTES ESTEQUIOMÉTRICOS.
+    Verifica la ecuación elemento a elemento:
+    cuenta átomos de H, Cl, Na y O en ambos lados.
+
+  ■ RELACIÓN MOLAR:
+    Los coeficientes estequiométricos indican la proporción
+    en que reaccionan los compuestos (en moles).
+    Si el coeficiente de HCl es X y el de NaOH es Y,
+    entonces X mol de HCl reaccionan con Y mol de NaOH.
+
+  ■ CÓMO CALCULAR MOLES DE REACTIVO:
+    Una vez ajustada la ecuación, usa una regla de tres
+    con los coeficientes como proporción de referencia:
+    coef(HCl) mol HCl  ──→  coef(NaOH) mol NaOH
+    2 mol HCl          ──→  ? mol NaOH
+
+  ■ REACCIÓN ÁCIDO-BASE (NEUTRALIZACIÓN):
+    Ácido + Base → Sal + Agua
+    HCl (ácido) + NaOH (base) → NaCl (sal) + H₂O
+  ─────────────────────────────────────────────────────────</span>
+
+<span class="amber-line">Primero ajusta la ecuación contando átomos. Luego usa los coeficientes
+para calcular cuántos moles de NaOH corresponden a 2 mol de HCl.</span>
+
+<span class="bold-line">¿Cuántos moles de NaOH son necesarios para neutralizar exactamente 2 mol de HCl?</span>
+Introduce solo el número (en mol):
+`);
+  showInput('Moles de NaOH necesarios (ej: 2)');
+  submitBtn.onclick = room3CheckAnswer;
+  userInput.onkeydown = (e) => { if(e.key==='Enter') room3CheckAnswer(); };
+}
+
+function room3CheckAnswer() {
+  const val = parseFloat(userInput.value.replace(',','.'));
+  clearFeedback();
+  if (isNaN(val)) { setFeedback('error', 'Introduce un número válido.'); return; }
+
+  if (Math.abs(val - 2) < 0.05) {
+    addItem('Pastillas de Ioduro de Potasio');
+    inputRow.classList.remove('visible');
+    hideAttempts();
+    setFeedback('success', `
+<span style="color:var(--green)">★ ESTEQUIOMETRÍA CORRECTA ★</span><br><br>
+<strong>Resolución:</strong><br>
+La reacción ajustada es: <strong>1 HCl + 1 NaOH → 1 NaCl + 1 H₂O</strong><br>
+La relación molar es 1:1 (un mol de HCl reacciona con un mol de NaOH).<br>
+Para 2 mol de HCl → necesitamos <strong>2 mol de NaOH</strong>.<br><br>
+La neutralización es completa. El refrigerante queda estabilizado. 
+Como recompensa del almacén, obtienes <span class="amber-line">Pastillas de Ioduro de Potasio</span> (protección tiroidea).<br><br>
+<span class="dim-line">ZVEZDA-1: "Reacción completada sin exceso. El pH del refrigerante es neutro. Abriendo acceso a Sala 4."</span>
+`);
+    setTimeout(() => {
+      STATE.room = 3;
+      updateHUD();
+      showRoom4();
+    }, 2800);
+  } else {
+    STATE.attemptsRoom++;
+    STATE.questionAttempts++;
+    updateAttemptPips();
+    addPressure(15);
+    addRad(10);
+
+    if (STATE.questionAttempts >= STATE.maxAttempts) {
+      inputRow.classList.remove('visible');
+      hideAttempts();
+      setFeedback('error', `
+<span style="color:var(--red)">✖ INTENTOS AGOTADOS — REACTOR NEUTRALIZADO DE EMERGENCIA</span><br><br>
+Tu respuesta: <strong>${val} mol</strong>.<br><br>
+<span style="color:var(--amber)">★ SOLUCIÓN: <strong>2 mol de NaOH</strong><br>
+Reacción ajustada: 1 HCl + 1 NaOH → 1 NaCl + 1 H₂O (relación 1:1)<br>
+Para 2 mol de HCl → 2 mol de NaOH</span><br><br>
+<span class="dim-line">ZVEZDA-1 activa la neutralización automática. Avanzando a Sala 4...</span>
+`);
+      addPressure(10);
+      setTimeout(() => { STATE.room = 3; updateHUD(); showRoom4(); }, 3000);
+    } else {
+      setFeedback('error', `
+<span style="color:var(--red)">✖ CANTIDAD INCORRECTA — +15% presión (Intento ${STATE.questionAttempts}/${STATE.maxAttempts})</span><br><br>
+Tu respuesta: <strong>${val} mol</strong>.<br>
+La relación molar HCl:NaOH es <strong>1:1</strong>. Para 2 mol HCl → ? mol NaOH<br>
+<span class="dim-line">Te queda ${STATE.maxAttempts - STATE.questionAttempts} intento(s).</span>
+`);
+      userInput.value = '';
+      userInput.focus();
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+// SALA 4: HANGAR DEL ROVER — CINEMÁTICA Y FUERZAS
+// ══════════════════════════════════════════════
+function showRoom4() {
+  resetQuestionAttempts();
+  STATE.phase = 'room4';
+  STATE.attemptsRoom = 0;
+  updateHUD();
+  clearFeedback();
+
+  const kamenevHint = STATE.character === 'kamenev'
+    ? `\n<span class="amber-line">KAMENEV activa su módulo de cinemática avanzada. Recuerdas la ecuación: v² = v₀² + 2·a·d</span>` : '';
+
+  setOutput(`<div class="room-title">◈ SALA 4: HANGAR DEL ROVER DE RESCATE ◈</div>
+
+<span class="dim-line">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+
+El hangar huele a grasa y ozono. Ante ti descansa el <strong>ROVER MK-IV "SPUTNIK TERRESTRE"</strong>: 
+2.400 kg de acero soviético sobre seis ruedas de caucho reforzado. 
+Para llegar a la sala de control y activar el enfriamiento de emergencia, 
+el rover debe cruzar el patio del reactor en tiempo récord.
+
+ZVEZDA-1 presenta los datos en la tarjeta perforada del rover:
+
+<span class="formula">ZVEZDA-1 // TARJETA DE PROGRAMACIÓN — ROVER MK-IV:
+  ─────────────────────────────────────────────
+  Masa del rover:       m = 2400 kg
+  Aceleración:          a = 0.5 m/s²
+  Velocidad inicial:    v₀ = 0 m/s (parte del reposo)
+  Distancia al objetivo: d = 200 m
+  ─────────────────────────────────────────────
+  PREGUNTA: ¿Cuál es la FUERZA NETA (en Newton) que debe
+  ejercer el motor para lograr esa aceleración?
+  ─────────────────────────────────────────────</span>
+${kamenevHint}
+
+<span class="formula">◈ ARCHIVO TÉCNICO — ZVEZDA-1 // TEORÍA: FUERZAS Y CINEMÁTICA
+  ─────────────────────────────────────────────────────────
+  ■ SEGUNDA LEY DE NEWTON:
+    La fuerza neta que actúa sobre un cuerpo es igual
+    al producto de su masa por su aceleración:
+
+        F = m · a
+
+    · F → Fuerza neta (en Newtons, N)
+    · m → Masa del cuerpo (en kilogramos, kg)
+    · a → Aceleración (en metros por segundo al cuadrado, m/s²)
+
+    1 Newton = 1 kg · m/s²
+
+  ■ MOVIMIENTO RECTILÍNEO UNIFORMEMENTE ACELERADO (MRUA):
+    El rover parte del reposo (v₀ = 0) y acelera de forma
+    constante. Su velocidad aumenta linealmente con el tiempo:
+        v = v₀ + a · t
+
+    La distancia recorrida:
+        d = v₀·t + ½·a·t²
+
+    Velocidad final en función de la distancia:
+        v² = v₀² + 2·a·d
+
+  ■ CÓMO RESOLVER ESTE PROBLEMA:
+    Identifica qué magnitudes te dan y qué te piden.
+    Selecciona la ecuación que relaciona esas magnitudes.
+    Sustituye los valores con sus unidades y opera.
+    Comprueba que el resultado tiene unidades de Newton (N).
+
+  ■ ATENCIÓN A LOS DATOS:
+    La tarjeta perforada incluye varios datos del rover.
+    No todos son necesarios para el cálculo de la fuerza.
+    Distingue qué datos usa la ley que vas a aplicar
+    y cuáles son solo contexto de la misión.
+  ─────────────────────────────────────────────────────────</span>
+
+<span class="amber-line">Identifica la ley que relaciona fuerza, masa y aceleración,
+y aplícala con los datos correctos de la tarjeta perforada.</span>
+
+<span class="bold-line">Introduce la fuerza neta en Newtons (solo el número):</span>
+`);
+  showInput('Fuerza en Newtons (ej: 1200)');
+  submitBtn.onclick = room4CheckAnswer;
+  userInput.onkeydown = (e) => { if(e.key==='Enter') room4CheckAnswer(); };
+}
+
+function room4CheckAnswer() {
+  const val = parseFloat(userInput.value.replace(',','.'));
+  clearFeedback();
+  if (isNaN(val)) { setFeedback('error', 'Introduce un número válido.'); return; }
+
+  if (Math.abs(val - 1200) < 1) {
+    inputRow.classList.remove('visible');
+    hideAttempts();
+    setFeedback('success', `
+<span style="color:var(--green)">★ FUERZA CORRECTA: 1200 N ★</span><br><br>
+<strong>Resolución:</strong><br>
+Segunda Ley de Newton: <strong>F = m · a</strong><br>
+F = 2400 kg × 0.5 m/s² = <strong>1200 N</strong><br><br>
+El motor soviético ruge. El ROVER MK-IV arranca y cruza el patio del reactor a velocidad creciente. 
+La tarjeta perforada se ejecuta a la perfección.<br><br>
+<span class="amber-line">La sala de control de emergencia se activa. Los sistemas de enfriamiento del reactor se conectan uno a uno.</span><br><br>
+<span class="dim-line">ZVEZDA-1: "...Temperatura del núcleo descendiendo. Presión normalizada. Camarada: habéis salvado KOSMOS-86."</span>
+`);
+    setTimeout(() => {
+      STATE.room = 4;
+      updateHUD();
+      triggerVictory();
+    }, 3500);
+  } else {
+    STATE.attemptsRoom++;
+    STATE.questionAttempts++;
+    updateAttemptPips();
+    addRad(15);
+    addPressure(10);
+
+    if (STATE.questionAttempts >= STATE.maxAttempts) {
+      inputRow.classList.remove('visible');
+      hideAttempts();
+      setFeedback('error', `
+<span style="color:var(--red)">✖ INTENTOS AGOTADOS — ROVER REENCAMINADO POR ZVEZDA-1</span><br><br>
+Tu respuesta: <strong>${val} N</strong>.<br><br>
+<span style="color:var(--amber)">★ SOLUCIÓN: <strong>F = 1200 N</strong><br>
+Segunda Ley de Newton: F = m · a<br>
+F = 2400 kg × 0.5 m/s² = <strong>1200 N</strong></span><br><br>
+<span class="dim-line">ZVEZDA-1 toma el control del rover. El reactor comienza a enfriarse...</span>
+`);
+      addRad(10);
+      setTimeout(() => { STATE.room = 4; updateHUD(); triggerVictory(); }, 3500);
+    } else {
+      setFeedback('error', `
+<span style="color:var(--red)">✖ FUERZA INCORRECTA — +15 mSv (Intento ${STATE.questionAttempts}/${STATE.maxAttempts})</span><br><br>
+Tu respuesta: <strong>${val} N</strong>.<br>
+Aplica <strong>F = m · a</strong>: masa = 2400 kg, aceleración = 0.5 m/s²<br>
+<span class="dim-line">Te queda ${STATE.maxAttempts - STATE.questionAttempts} intento(s).</span>
+`);
+      userInput.value = '';
+      userInput.focus();
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+function startGame() {
+  STATE.rad = 0;
+  STATE.pressure = 50;
+  STATE.inventory = [];
+  STATE.character = null;
+  STATE.room = 0;
+  STATE.phase = 'intro';
+  hud.style.display = 'none';
+  invPanel.style.display = 'none';
+  roomDots.style.display = 'none';
+  charDisplay.style.display = 'none';
+  clearFeedback();
+  showIntro();
+}
+
+// Boot sequence
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('loading').classList.add('hidden');
+    setTimeout(() => {
+      document.getElementById('loading').style.display = 'none';
+      startGame();
+    }, 800);
+  }, 2800);
+});
+</script>
+</body>
+</html>
